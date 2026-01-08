@@ -1,0 +1,6 @@
+<resources>
+    <string name="app_name">Hector Scraper</string>
+
+    <string name="accessibility_desc">Instamart automation accessibility service</string>
+    <string name="GEO_API_KEY">AIzaSyAi5Il4Az-Wd3YaNKH7sAvbchcP-i-k93g</string>
+</resources>
