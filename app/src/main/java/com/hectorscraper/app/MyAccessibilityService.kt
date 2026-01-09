@@ -17,6 +17,15 @@ import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.Toast
+import com.hectorscraper.app.randomiseFlow.CategoryFlowHandler
+import com.hectorscraper.app.randomiseFlow.CategoryKeywordFlowHandler
+import com.hectorscraper.app.randomiseFlow.CategoryProductFlowHandler
+import com.hectorscraper.app.randomiseFlow.CategoryRandomProductFlowHandler
+import com.hectorscraper.app.randomiseFlow.HotDealFlowHandler
+import com.hectorscraper.app.randomiseFlow.HotDealSearchFlowHandler
+import com.hectorscraper.app.randomiseFlow.ShopListFlowHandler
+import com.hectorscraper.app.randomiseFlow.UserAddressFlowHandler
+import com.hectorscraper.app.randomiseFlow.UserProfileFlow
 import com.hectorscraper.app.utils.ExcelManager
 import com.hectorscraper.app.utils.HectorScraper
 import com.hectorscraper.app.utils.HectorScraper.Companion.killInstamartApp
@@ -34,6 +43,16 @@ class MyAccessibilityService : AccessibilityService() {
         var instance: MyAccessibilityService? = null
     }
 
+    private lateinit var userProfileFlowHandler: UserProfileFlow
+    private lateinit var categoryFlowHandler: CategoryFlowHandler
+
+    private lateinit var userAddressFlowHandler: UserAddressFlowHandler
+    private lateinit var hotDealFlowHandler: HotDealFlowHandler
+    private lateinit var hotDealSearchFlowHandler: HotDealSearchFlowHandler
+    private lateinit var categoryKeywordFlowHandler: CategoryKeywordFlowHandler
+    private lateinit var categoryProductFlowHandler: CategoryProductFlowHandler
+    private lateinit var categoryRandomProductFlowHandler: CategoryRandomProductFlowHandler
+    private lateinit var shopListFlowHandler: ShopListFlowHandler
     private var randomFlowCounter = 0
 
     private var viewCartRetryCount = 0
@@ -236,6 +255,7 @@ class MyAccessibilityService : AccessibilityService() {
 //                dumpTree(rootInActiveWindow)
 //
 //            }
+            userProfileFlow()
         }, 3000)
 
         if (!searchClicked) {
@@ -371,50 +391,15 @@ class MyAccessibilityService : AccessibilityService() {
         }, 1500)
     }
 
-    private fun callCategoryFlow3(root: AccessibilityNodeInfo) {
-        clickCategoriesButtonFlow3(root)
-        isCategoryFlow3 = true
-    }
-
-    fun clickCategoriesButtonFlow3(root: AccessibilityNodeInfo) {
-        val containers = root.findAccessibilityNodeInfosByViewId(
-            "in.swiggy.android.instamart:id/item_container"
-        )
-
-        if (containers.isNullOrEmpty()) {
-            Log.e("A11Y", "❌ No item_container found")
-            return
-        }
-
-        for (container in containers) {
-            val children = container.findAccessibilityNodeInfosByText("Categories")
-            if (children.isNotEmpty()) {
-                container.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                Log.e("A11Y", "✅ Categories clicked")
-
-                handler.postDelayed({
-                    startRandomCategoryFlow()
-                }, 2500)
-
-                return
+    private fun callCategoryFlow3() {
+        categoryRandomProductFlowHandler = CategoryRandomProductFlowHandler(
+            service = this,
+            categories = listOf("Vegetables", "Fruits", "Snacks", "Dairy"),
+            onFlowCompleted = {
+                isRandomFlowDone = true
+                Log.e("A11Y", "➡️ Category Flow-3 completed")
             }
-        }
-
-        Log.e("A11Y", "❌ Categories button not found")
-    }
-
-    private fun startRandomCategoryFlow() {
-        if (targetCategory != null) {
-            Log.d("A11Y", "⚠️ Category flow already running")
-            return
-        }
-
-        targetCategory = categories.random()
-        scrollAttempts = 0
-
-        Log.d("A11Y", "🎯 Selected category: $targetCategory")
-
-        findAndClickCategory()
+        )
     }
 
     private fun findAndClickCategory() {
@@ -821,89 +806,13 @@ class MyAccessibilityService : AccessibilityService() {
     }
 
     private fun callShopListFlow1() {
-        clickShoppingListIcon()
-        isShopListFlow1 = true
-    }
-
-    private fun clickShoppingListIcon(): Boolean {
-        val root = rootInActiveWindow ?: run {
-            Log.e("A11Y", "❌ rootInActiveWindow is null")
-            return false
-        }
-
-        val nodes = root.findAccessibilityNodeInfosByViewId(
-            "in.swiggy.android.instamart:id/shoppingListIcon"
-        )
-
-        if (nodes.isNullOrEmpty()) {
-            Log.e("A11Y", "❌ shoppingListIcon not found")
-            return false
-        }
-
-        val icon = nodes[0]
-
-        // Try direct click
-        if (icon.isClickable) {
-            icon.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-            Log.e("A11Y", "✅ Clicked shoppingListIcon directly")
-            return true
-        }
-
-        // Try clickable parent
-        val clickableParent = findClickableParent(icon)
-        if (clickableParent != null) {
-            clickableParent.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-            Log.e("A11Y", "✅ Clicked shoppingListIcon via parent")
-            handler.postDelayed({ clickWriteItComposeSafe() }, 2000)
-            return true
-        }
-
-        Log.e("A11Y", "❌ shoppingListIcon not clickable")
-        return false
-    }
-
-    fun clickWriteItComposeSafe(): Boolean {
-        val root = rootInActiveWindow ?: return false
-
-        fun traverse(node: AccessibilityNodeInfo?): AccessibilityNodeInfo? {
-            if (node == null) return null
-
-            val text = node.text?.toString()?.lowercase()
-            val desc = node.contentDescription?.toString()?.lowercase()
-
-            if (text?.contains("write it") == true || desc?.contains("write it") == true) {
-                return node
-            }
-
-            for (i in 0 until node.childCount) {
-                val found = traverse(node.getChild(i))
-                if (found != null) return found
-            }
-            return null
-        }
-
-        val targetNode = traverse(root)
-
-        if (targetNode == null) {
-            Log.e("A11Y", "❌ 'Write it' not found even by traversal")
-            return false
-        }
-
-        // Try clickable parent
-        findClickableParent(targetNode)?.let {
-            it.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-            Log.e("A11Y", "✅ Clicked parent of 'Write it'")
-            handler.postDelayed({
-                performGlobalAction(GLOBAL_ACTION_BACK)
+        shopListFlowHandler = ShopListFlowHandler(
+            service = this,
+            onFlowCompleted = {
                 isRandomFlowDone = true
-            }, 3000)
-            return true
-        }
-
-        // Fallback: tap by bounds
-        clickByBounds(targetNode)
-        Log.e("A11Y", "✅ Clicked 'Write it' via gesture tap")
-        return true
+                Log.e("A11Y", "➡️ ShopList Flow-1 completed")
+            }
+        )
     }
 
     fun clickByBounds(node: AccessibilityNodeInfo) {
@@ -922,120 +831,14 @@ class MyAccessibilityService : AccessibilityService() {
         dispatchGesture(gesture, null, null)
     }
 
-    fun callCategoryFlow2(): Boolean {
-        val root = rootInActiveWindow ?: return false
-
-        val keyword = categoryKeywords.random()
-        Log.e("A11Y_KEYWORD", "🎯 Selected keyword: $keyword")
-
-        fun traverse(node: AccessibilityNodeInfo?): Boolean {
-            if (node == null) return false
-
-            val text = node.text?.toString()?.trim()
-
-            if (!text.isNullOrEmpty() && text.equals(keyword, ignoreCase = true)) {
-                val clickable = findClickableParent(node) ?: node
-                if (clickable.isClickable) {
-                    clickable.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                    isClickedOnKeyword = true
-                    handler.postDelayed({ findSeeAllOrFallbackFlow2(root) }, 2000)
-                    Log.e("A11Y_KEYWORD", "✅ Clicked keyword: $keyword")
-                    return true
-                }
-            }
-
-            for (i in 0 until node.childCount) {
-                if (traverse(node.getChild(i))) return true
-            }
-            return false
-        }
-
-        val clicked = traverse(root)
-
-        if (!clicked) {
-            Log.e("A11Y_KEYWORD", "❌ Keyword not found on screen: $keyword")
-        }
-
-        return clicked
-    }
-
-    fun findSeeAllOrFallbackFlow2(root: AccessibilityNodeInfo?) {
-        if (root == null) return
-
-        var attempts = 0
-        val maxAttempts = 10
-
-        fun tryNext() {
-            val currentRoot = rootInActiveWindow ?: return
-
-            // 1️⃣ Try clicking "See All"
-            if (clickSeeAllFlow2(currentRoot)) {
-                Log.e("A11Y_FLOW", "✅ See All clicked")
-                return
-            }
-
-            // 2️⃣ Try scrolling
-            val scrollNode = findScrollableNode(currentRoot)
-            if (scrollNode != null && attempts < maxAttempts) {
-                attempts++
-                Log.e("A11Y_FLOW", "⬇️ Scrolling down attempt $attempts")
-                scrollNode.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)
-
-                handler.postDelayed({ tryNext() }, 1200)
-                return
-            }
-
-            // 3️⃣ Fallback: Click product via increment button
-            Log.e("A11Y_FLOW", "⚠️ See All not found, using fallback")
-            clickProductViaIncrementFlow2(currentRoot)
-        }
-
-        tryNext()
-    }
-
-    fun clickSeeAllFlow2(root: AccessibilityNodeInfo): Boolean {
-        val nodes = root.findAccessibilityNodeInfosByText("See All")
-
-        for (node in nodes) {
-            val clickable = findClickableParent(node)
-            if (clickable != null) {
-                clickable.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                Log.e("A11Y", "👉 Clicked See All")
-                handler.postDelayed({ randomScrollThenClick() }, 2000)
-                return true
-            }
-        }
-        return false
-    }
-
-    fun clickProductViaIncrementFlow2(root: AccessibilityNodeInfo): Boolean {
-        val incrementNodes = root.findAccessibilityNodeInfosByViewId(
-            "in.swiggy.android.instamart:id/increment_button"
-        )
-
-        if (incrementNodes.isNullOrEmpty()) {
-            Log.e("A11Y", "❌ increment_button not found")
-            return false
-        }
-
-        val increment = incrementNodes.random()
-        var parent = increment.parent
-        var depth = 0
-
-        // climb up until product layout
-        while (parent != null && depth < 6) {
-            if (parent.viewIdResourceName == "in.swiggy.android.instamart:id/image_layout") {
-                parent.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                Log.e("A11Y", "✅ Clicked product via image_layout fallback")
+    fun callProductCategoryFlow2(){
+        categoryProductFlowHandler = CategoryProductFlowHandler(
+            service = this,
+            categoryKeywords = categoryKeywords,
+            onFlowCompleted = {
                 isRandomFlowDone = true
-                return true
             }
-            parent = parent.parent
-            depth++
-        }
-
-        Log.e("A11Y", "❌ image_layout not found above increment_button")
-        return false
+        )
     }
 
 //    fun clickAnyKeywordOnScreen(): Boolean {
@@ -1135,398 +938,36 @@ class MyAccessibilityService : AccessibilityService() {
         Log.e("A11Y", "No clickable parent found for close button")
     }
 
-
-    fun clickRandomKeywordOnScreen(): Boolean {
-        val root = rootInActiveWindow ?: return false
-
-        val keyword = categoryKeywords.random()
-        Log.e("A11Y_KEYWORD", "🎯 Selected keyword: $keyword")
-
-        fun traverse(node: AccessibilityNodeInfo?): Boolean {
-            if (node == null) return false
-
-            val text = node.text?.toString()?.trim()
-
-            if (!text.isNullOrEmpty() && text.equals(keyword, ignoreCase = true)) {
-                val clickable = findClickableParent(node) ?: node
-                if (clickable.isClickable) {
-                    clickable.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                    isClickedOnKeyword = true
-                    handler.postDelayed({ findSeeAllOrFallback(root) }, 2000)
-                    Log.e("A11Y_KEYWORD", "✅ Clicked keyword: $keyword")
-                    return true
-                }
+    fun callCategoryFlow(){
+        categoryKeywordFlowHandler = CategoryKeywordFlowHandler(
+            service = this,
+            categoryKeywords = categoryKeywords,
+            onFlowCompleted = {
+                isRandomFlowDone = true
+                Log.e("A11Y", "➡️ Category keyword flow completed")
+                // startNextFlow()
             }
-
-            for (i in 0 until node.childCount) {
-                if (traverse(node.getChild(i))) return true
-            }
-            return false
-        }
-
-        val clicked = traverse(root)
-
-        if (!clicked) {
-            Log.e("A11Y_KEYWORD", "❌ Keyword not found on screen: $keyword")
-        }
-
-        return clicked
-    }
-
-    fun findSeeAllOrFallback(root: AccessibilityNodeInfo?) {
-        if (root == null) return
-
-        var attempts = 0
-        val maxAttempts = 10
-
-        fun tryNext() {
-            val currentRoot = rootInActiveWindow ?: return
-
-            // 1️⃣ Try clicking "See All"
-            if (clickSeeAll(currentRoot)) {
-                Log.e("A11Y_FLOW", "✅ See All clicked")
-                return
-            }
-
-            // 2️⃣ Try scrolling
-            val scrollNode = findScrollableNode(currentRoot)
-            if (scrollNode != null && attempts < maxAttempts) {
-                attempts++
-                Log.e("A11Y_FLOW", "⬇️ Scrolling down attempt $attempts")
-                scrollNode.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)
-
-                handler.postDelayed({ tryNext() }, 1200)
-                return
-            }
-
-            // 3️⃣ Fallback: Click product via increment button
-            Log.e("A11Y_FLOW", "⚠️ See All not found, using fallback")
-            clickProductViaIncrement(currentRoot)
-        }
-
-        tryNext()
-    }
-
-    fun clickSeeAll(root: AccessibilityNodeInfo): Boolean {
-        val nodes = root.findAccessibilityNodeInfosByText("See All")
-
-        for (node in nodes) {
-            val clickable = findClickableParent(node)
-            if (clickable != null) {
-                clickable.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                Log.e("A11Y", "👉 Clicked See All")
-                handler.postDelayed({ randomScrollThenClick() }, 2000)
-                return true
-            }
-        }
-        return false
-    }
-
-    fun clickProductViaIncrement(root: AccessibilityNodeInfo): Boolean {
-        val incrementNodes = root.findAccessibilityNodeInfosByViewId(
-            "in.swiggy.android.instamart:id/increment_button"
         )
-
-        if (incrementNodes.isNullOrEmpty()) {
-            Log.e("A11Y", "❌ increment_button not found")
-            return false
-        }
-
-        val increment = incrementNodes.random()
-        var parent = increment.parent
-        var depth = 0
-
-        // climb up until product layout
-        while (parent != null && depth < 6) {
-            if (parent.viewIdResourceName == "in.swiggy.android.instamart:id/image_layout") {
-                parent.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                Log.e("A11Y", "✅ Clicked product via image_layout fallback")
-                return true
-            }
-            parent = parent.parent
-            depth++
-        }
-
-        Log.e("A11Y", "❌ image_layout not found above increment_button")
-        return false
     }
 
     private fun hotDealProductSearchFlow(root: AccessibilityNodeInfo) {
-        val xyz = clickSeeAllDirectSearch()
-        Log.e(TAG, "hotDealProductSearchFlow: $xyz")
-    }
-
-    fun clickSeeAllDirectSearch(): Boolean {
-        val root = rootInActiveWindow ?: run {
-            Log.e("A11Y", "❌ rootInActiveWindow is NULL")
-            return false
-        }
-
-        val nodes = root.findAccessibilityNodeInfosByText("See All")
-        Log.e("A11Y", "🔍 Found ${nodes.size} 'See All' nodes")
-
-        nodes.forEach { node ->
-            val clickable = if (node.isClickable) node else findClickableParent(node)
-
-            if (clickable != null) {
-                clickable.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                Log.e("A11Y", "✅ Clicked See All (direct)")
-                isHotDealFlow = true
-                handler.postDelayed({ randomScrollThenGoTopAndSearch() }, 1500)
-                return true
+        hotDealSearchFlowHandler = HotDealSearchFlowHandler(
+            service = this,
+            productKeywords = productKeywords,
+            onFlowCompleted = {
+                isRandomFlowDone = true
+                Log.e("A11Y", "➡️ Move to next flow here")
             }
-        }
-
-        Log.e("A11Y", "❌ See All not clicked")
-        return false
-    }
-
-    fun randomScrollThenGoTopAndSearch() {
-        val metrics = resources.displayMetrics
-
-        val centerX = metrics.widthPixels / 2f
-        val downStartY = metrics.heightPixels * 0.75f
-        val downEndY = metrics.heightPixels * 0.25f
-
-        val totalScrolls = (1..5).random()
-        var currentScroll = 0
-
-        Log.e("A11Y", "🎲 Random scroll count = $totalScrolls")
-
-        fun swipeDown() {
-            val path = Path().apply {
-                moveTo(centerX, downStartY)
-                lineTo(centerX, downEndY)
-            }
-
-            dispatchGesture(
-                GestureDescription.Builder().addStroke(
-                    GestureDescription.StrokeDescription(
-                        path, 0, (450..700).random().toLong()
-                    )
-                ).build(), null, null
-            )
-
-            currentScroll++
-            Log.e("A11Y", "⬇️ Scroll down $currentScroll")
-        }
-
-        fun performScrollDown() {
-            if (currentScroll < totalScrolls) {
-                swipeDown()
-                handler.postDelayed(
-                    { performScrollDown() }, (1200..2200).random().toLong()
-                )
-            } else {
-                handler.postDelayed({
-                    scrollUpSameTimes(totalScrolls)
-                }, (1000..1600).random().toLong())
-            }
-        }
-
-        performScrollDown()
-    }
-
-    fun scrollUpSameTimes(times: Int) {
-        val metrics = resources.displayMetrics
-
-        val centerX = metrics.widthPixels / 2f
-        val upStartY = metrics.heightPixels * 0.25f
-        val upEndY = metrics.heightPixels * 0.75f
-
-        var count = 0
-
-        fun swipeUp() {
-            val path = Path().apply {
-                moveTo(centerX, upStartY)
-                lineTo(centerX, upEndY)
-            }
-
-            dispatchGesture(
-                GestureDescription.Builder().addStroke(
-                    GestureDescription.StrokeDescription(
-                        path, 0, (500..750).random().toLong()
-                    )
-                ).build(), null, null
-            )
-
-            count++
-            Log.e("A11Y", "⬆️ Scroll up $count")
-        }
-
-        fun performScrollUp() {
-            if (count < times) {
-                swipeUp()
-                handler.postDelayed(
-                    { performScrollUp() }, (1200..2000).random().toLong()
-                )
-            } else {
-                handler.postDelayed({
-                    clickSearchIcon()
-                }, (800..1400).random().toLong())
-            }
-        }
-
-        performScrollUp()
-    }
-
-    fun clickSearchIcon(): Boolean {
-        val root = rootInActiveWindow ?: return false
-
-        val nodes = root.findAccessibilityNodeInfosByViewId(
-            "in.swiggy.android.instamart:id/iv_search_image"
         )
-
-        if (!nodes.isNullOrEmpty()) {
-            for (node in nodes) {
-                val clickable = findClickableParent(node)
-                if (clickable != null) {
-                    clickable.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                    Log.e("A11Y", "🔍 Clicked search icon")
-                    handler.postDelayed({ typeRandomly() }, 1000)
-                    return true
-                }
-            }
-        }
-
-        Log.e("A11Y", "❌ Search icon not found")
-        return false
-    }
-
-    private fun typeRandomly() {
-        val root = rootInActiveWindow ?: return
-
-        val edit = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
-        if (edit == null) {
-            Log.e(TAG, "❌ Could not find search EditText")
-            return
-        }
-
-        // Pick random keyword
-        val randomKeyword = productKeywords.random()
-
-        edit.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
-
-        val args = Bundle().apply {
-            putCharSequence(
-                AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, randomKeyword
-            )
-        }
-
-        edit.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
-
-        Log.e(TAG, "⌨️ Typed random keyword: $randomKeyword")
-
-        handler.postDelayed({
-            clickOnSearchHotDealResult()
-        }, (2000..3500).random().toLong())
-    }
-
-    fun clickOnSearchHotDealResult() {
-        val root = rootInActiveWindow ?: return
-        val rv = root.findAccessibilityNodeInfosByViewId(
-            "in.swiggy.android.instamart:id/search_results"
-        ).firstOrNull()
-        if (rv == null) {
-            Log.e("A11Y", "❌ RecyclerView not found")
-            return
-        }
-        if (rv.childCount == 0) {
-            Log.e("A11Y", "❌ No suggestions")
-            return
-        }
-        val item = rv.getChild(0)
-        val rect = Rect()
-        item.getBoundsInScreen(rect)
-        Log.e("A11Y", "✔ Clicking suggestion @ $rect")
-        item.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-
-        handler.postDelayed({
-            clickRandomProductAndBack()
-        }, 3000)
-    }
-
-    fun clickRandomProductAndBack() {
-        val root = rootInActiveWindow ?: return
-
-        val nodes = root.findAccessibilityNodeInfosByViewId(
-            "in.swiggy.android.instamart:id/open_item_v3"
-        )
-
-        if (nodes.isNullOrEmpty()) {
-            Log.e("A11Y", "❌ No product items found")
-            return
-        }
-
-        // Pick random product
-        val product = nodes.random()
-
-        val rect = Rect()
-        product.getBoundsInScreen(rect)
-        Log.e("A11Y", "🟢 Clicking product at bounds: $rect")
-
-        val clickable = findClickableParent(product) ?: product
-
-        if (clickable.isClickable) {
-            clickable.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-            Log.e("A11Y", "✅ Clicked random product")
-
-            handler.postDelayed({
-                pressBackMultipleTimes(5)
-            }, (2500..3500).random().toLong())
-        } else {
-            Log.e("A11Y", "❌ Product not clickable")
-        }
-    }
-
-    fun pressBackMultipleTimes(times: Int) {
-        var count = 0
-
-        fun pressNext() {
-            if (count < times) {
-                performGlobalAction(GLOBAL_ACTION_BACK)
-                count++
-                Log.e("A11Y", "🔙 Back pressed $count")
-
-                handler.postDelayed(
-                    { pressNext() }, (800..1400).random().toLong()
-                )
-            }
-        }
-        pressNext()
-        if (count == times) {
-            isRandomFlowDone = true
-        }
     }
 
     private fun hotDealProductFlow(root1: AccessibilityNodeInfo) {
-        val xyz = clickSeeAllDirect()
-        Log.e(TAG, "hotDealProductFlow: $xyz")
-    }
-
-    fun clickSeeAllDirect(): Boolean {
-        val root = rootInActiveWindow ?: run {
-            Log.e("A11Y", "❌ rootInActiveWindow is NULL")
-            return false
-        }
-
-        val nodes = root.findAccessibilityNodeInfosByText("See All")
-        Log.e("A11Y", "🔍 Found ${nodes.size} 'See All' nodes")
-
-        nodes.forEach { node ->
-            val clickable = if (node.isClickable) node else findClickableParent(node)
-
-            if (clickable != null) {
-                clickable.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                Log.e("A11Y", "✅ Clicked See All (direct)")
-                isHotDealFlow = true
-                handler.postDelayed({ randomScrollThenClick() }, 1500)
-                return true
+        hotDealFlowHandler = HotDealFlowHandler(
+            service = this,
+            onFlowCompleted = {
+                isRandomFlowDone = true
             }
-        }
-
-        Log.e("A11Y", "❌ See All not clicked")
-        return false
+        )
     }
 
     fun randomScrollThenClick() {
@@ -1676,9 +1117,9 @@ class MyAccessibilityService : AccessibilityService() {
             "UserAddress" to { userAddressPageFlow() },
             "hotDealFlow1" to { hotDealProductFlow(root) },
             "hotDealFlow2" to { hotDealProductSearchFlow(root) },
-            "CategoryFlow1" to { clickRandomKeywordOnScreen() },
-            "CategoryFlow2" to { callCategoryFlow2() },
-            "CategoryFlow3" to { callCategoryFlow3(root) },
+            "CategoryFlow1" to { callCategoryFlow() },
+            "CategoryFlow2" to { callProductCategoryFlow2() },
+            "CategoryFlow3" to { callCategoryFlow3() },
             "ShopListFlow1" to { callShopListFlow1() },
             "WishList" to { callWishListFlow() })
 
@@ -1702,93 +1143,32 @@ class MyAccessibilityService : AccessibilityService() {
     }
 
     private fun userAddressPageFlow() {
-        if (!isUserAddressRedirect) {
-            val userAddress = clickAddressSelector()
-            Log.e(TAG, "onAccessibilityEvent: $userAddress")
-        }
+        userAddressFlowHandler = UserAddressFlowHandler(
+            service = this,
+            onFlowCompleted = {
+                isRandomFlowDone = true
+                Log.e("A11Y", "➡️ Move to next flow here")
+            }
+        )
     }
 
     private fun categoryPageFlow(root: AccessibilityNodeInfo) {
-        if (!isCategoryRedirected) {
-            clickCategoriesButton(root)
-        }
+        categoryFlowHandler = CategoryFlowHandler(
+            service = this,
+            onFlowCompleted = {
+                isRandomFlowDone = true
+                Log.e("A11Y", "➡️ Move to next flow here")
+            }
+        )
     }
 
     private fun userProfileFlow() {
-        if (!isUserProfileRedirect) {
-            val userProfile = clickUserAccountIcon()
-            Log.e(TAG, "onAccessibilityEvent: $userProfile")
-        }
-    }
-
-    fun clickAddressSelector(): Boolean {
-        val root = rootInActiveWindow ?: run {
-            Log.e("A11Y", "❌ rootInActiveWindow is NULL")
-            return false
-        }
-
-        val id = "in.swiggy.android.instamart:id/address_selector_area"
-        val nodes = root.findAccessibilityNodeInfosByViewId(id)
-
-        Log.d("A11Y", "🔍 Found ${nodes.size} nodes for address_selector_area")
-
-        nodes.forEach { node ->
-            val clickableNode = if (node.isClickable) node else findAddressParent(node)
-
-            if (clickableNode != null) {
-                clickableNode.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                Log.e("A11Y", "✅ Address selector clicked")
-                isUserAddressRedirect = true
-                handler.postDelayed({
-                    performGlobalAction(GLOBAL_ACTION_BACK)
-                    isRandomFlowDone = true
-                }, 1500)
-                return true
+        userProfileFlowHandler = UserProfileFlow(
+            service = this,
+            onFlowCompleted = {
+                isRandomFlowDone = true
             }
-        }
-
-        Log.e("A11Y", "❌ Address selector NOT clicked")
-        return false
-    }
-
-    fun findAddressParent(node: AccessibilityNodeInfo?): AccessibilityNodeInfo? {
-        var current = node
-        var depth = 0
-
-        while (current != null && depth < 6) {
-            if (current.isClickable) return current
-            current = current.parent
-            depth++
-        }
-        return null
-    }
-
-    fun clickUserAccountIcon(): Boolean {
-        val root = rootInActiveWindow ?: return false
-
-        fun traverse(node: AccessibilityNodeInfo?): Boolean {
-            if (node == null) return false
-
-            if (node.className == "android.widget.ImageView" && node.isClickable && node.contentDescription?.toString()
-                    ?.equals("Show account", ignoreCase = true) == true
-            ) {
-                node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                isUserProfileRedirect = true
-                Log.e("A11Y", "✅ User account icon clicked")
-                handler.postDelayed({
-                    performGlobalAction(GLOBAL_ACTION_BACK)
-                    isRandomFlowDone = true
-                }, 1500)
-                return true
-            }
-
-            for (i in 0 until node.childCount) {
-                if (traverse(node.getChild(i))) return true
-            }
-            return false
-        }
-
-        return traverse(root)
+        )
     }
 
     fun clearAllValues() {
