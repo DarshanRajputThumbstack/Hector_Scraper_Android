@@ -20,8 +20,10 @@ class LocationCookieInterceptor(
 
         val requestWithCookies = originalRequest.newBuilder()
             .addHeader("Cookie", cookieValue)
+            .addHeader("Cache-Control", "no-cache")
+//            .addHeader("User-Agent", "Swiggy-Android")
             .build()
-        Log.e("COOKIE", "➡️ Request URL: ${requestWithCookies.url}")
+        Log.e("COOKIE", "➡️ Request URL: ${requestWithCookies}")
 
 
         val response = chain.proceed(requestWithCookies)

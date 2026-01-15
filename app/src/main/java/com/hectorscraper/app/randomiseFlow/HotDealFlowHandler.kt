@@ -19,11 +19,13 @@ class HotDealFlowHandler(
     }
 
     private var isHotDealFlowStarted = false
+    private var isFlowCompleted = false
 
-    fun hotDealProductFlow() {
+    fun startFlow() {
+        if (isFlowCompleted) return
+
         if (!isHotDealFlowStarted) {
-            val clicked = clickSeeAllDirect()
-            Log.e(TAG, "hotDealProductFlow: $clicked")
+            clickSeeAllDirect()
         }
     }
 

@@ -28,7 +28,7 @@ import java.util.Locale
 import java.util.UUID
 import kotlin.collections.iterator
 
-object AccessibilityChecker {
+object Extension {
 
     fun isServiceEnabled(context: Context, serviceClass: Class<*>): Boolean {
         val expectedComponent = ComponentName(context, serviceClass)
@@ -147,6 +147,7 @@ object AccessibilityChecker {
     fun getLatLngFromPincodeOSM(
         pincode: String, callback: (LatLng?) -> Unit
     ) {
+        Log.e("TAG", "getLatLngFromPincodeOSM: $pincode", )
         val url = "https://nominatim.openstreetmap.org/search" + "?postalcode=$pincode" + "&country=India" + "&format=json"
 
         val client = OkHttpClient()
@@ -157,10 +158,12 @@ object AccessibilityChecker {
         client.newCall(request).enqueue(object : Callback {
 
             override fun onFailure(call: Call, e: IOException) {
+                Log.e("TAG", "getLatLngFromPincodeOSM: $e", )
                 callback(null)
             }
 
             override fun onResponse(call: Call, response: Response) {
+                Log.e("TAG", "getLatLngFromPincodeOSM: $response", )
                 val body = response.body?.string() ?: run {
                     callback(null)
                     return

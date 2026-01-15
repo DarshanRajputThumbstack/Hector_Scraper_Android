@@ -19,11 +19,20 @@ class UserAddressFlowHandler(
     }
 
     private var isUserAddressRedirect = false
+    private var isFlowCompleted = false
 
     fun userAddressPageFlow() {
         if (!isUserAddressRedirect) {
             val clicked = clickAddressSelector()
             Log.d(TAG, "Address selector clicked = $clicked")
+        }
+    }
+
+    fun startFlow() {
+        if (isFlowCompleted) return
+
+        if (!isUserAddressRedirect) {
+            clickAddressSelector()
         }
     }
 

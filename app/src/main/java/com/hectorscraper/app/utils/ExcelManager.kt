@@ -28,8 +28,8 @@ object ExcelManager {
             "date", "scrape_timestamp", "store_id", "merchant_id", "product_id",
             "sku_name", "brand", "sku_url", "grammage", "l0_category",
             "l1_category", "l2_category","dark_store_name", "dark_store_address", "city", "locality", "pincode",
-            "plus_code", "availability_flag", "inventory", "mrp", "sp",
-            "discount_pct", "eta_identifier", "merchant_type", "ranking","time"
+            "plus_code", "availability_flag","store_availability", "inventory", "mrp", "sp",
+            "discount_pct", "eta_identifier", "merchant_type", "ranking","placement_type","time"
         )
 
         val headerRow = sheet.createRow(0)

@@ -21,26 +21,30 @@ import com.hectorscraper.app.api.HectorViewModelFactory
 import com.hectorscraper.app.api.model.NetworkStatus
 import com.hectorscraper.app.databinding.ActivityMainBinding
 import com.hectorscraper.app.databinding.DialogPincodeBinding
-import com.hectorscraper.app.utils.AccessibilityChecker
-import com.hectorscraper.app.utils.AccessibilityChecker.canMockLocation
-import com.hectorscraper.app.utils.AccessibilityChecker.getLatLngFromPincodeOSM
-import com.hectorscraper.app.utils.AccessibilityChecker.hasLocationPermission
-import com.hectorscraper.app.utils.AccessibilityChecker.hasNotificationPermission
-import com.hectorscraper.app.utils.AccessibilityChecker.openMockLocationSettings
-import com.hectorscraper.app.utils.AccessibilityChecker.pincodeToLatLng
-import com.hectorscraper.app.utils.AccessibilityChecker.setMockLocation
 import com.hectorscraper.app.utils.CustomProgressDialog
 import com.hectorscraper.app.utils.ExcelManager
+import com.hectorscraper.app.utils.Extension
+import com.hectorscraper.app.utils.Extension.canMockLocation
+import com.hectorscraper.app.utils.Extension.getLatLngFromPincodeOSM
+import com.hectorscraper.app.utils.Extension.hasLocationPermission
+import com.hectorscraper.app.utils.Extension.hasNotificationPermission
+import com.hectorscraper.app.utils.Extension.openMockLocationSettings
+import com.hectorscraper.app.utils.Extension.pincodeToLatLng
+import com.hectorscraper.app.utils.Extension.setMockLocation
 import com.hectorscraper.app.utils.HectorScraper
-import com.hectorscraper.app.utils.HectorScraper.Companion.currentIndex
+import com.hectorscraper.app.utils.HectorScraper.Companion.categoryIndex
+import com.hectorscraper.app.utils.HectorScraper.Companion.categoryList
+import com.hectorscraper.app.utils.HectorScraper.Companion.currentCategory
+import com.hectorscraper.app.utils.HectorScraper.Companion.currentPincode
+import com.hectorscraper.app.utils.HectorScraper.Companion.pincodeIndex
 import com.hectorscraper.app.utils.HectorScraper.Companion.pincodeList
+import com.hectorscraper.app.utils.PreferenceManager
 
 class MainActivity : AppCompatActivity() {
 
 
     private lateinit var binding: ActivityMainBinding
     lateinit var customProgressDialog: CustomProgressDialog
-    private var currentPincode = ""
 
     private val viewModel by lazy {
         ViewModelProvider(this, HectorViewModelFactory(application))[HectorViewModel::class.java]
@@ -63,19 +67,14 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-//        enableEdgeToEdge()
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-//        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
-//            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-//            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
-//            insets
-//        }
         init()
     }
 
     private fun init() = with(binding) {
-        currentPincode = pincodeList[currentIndex]
+        currentPincode = pincodeList[pincodeIndex]
+        currentCategory = categoryList[categoryIndex]
         customProgressDialog = CustomProgressDialog(this@MainActivity)
         customProgressDialog.setCanceledOnTouchOutside(false)
         setUpObserver()
@@ -89,12 +88,16 @@ class MainActivity : AppCompatActivity() {
 //            val intent = Intent(ACTION_START_AUTOMATION)
 //            sendBroadcast(intent)
             Toast.makeText(this@MainActivity, "Current Pincode: $currentPincode", Toast.LENGTH_SHORT).show()
-            setLatLong(currentPincode)
-//            sendBroadcast(
-//                Intent().apply {
-//                    action = MyAccessibilityService.ACTION_START_AUTOMATION
-//                })
-//            Toast.makeText(applicationContext, "Sent start command — enable accessibility and try again if needed", Toast.LENGTH_SHORT).show()
+            if (categoryIndex == 0) {
+                setLatLong(currentPincode)
+            } else {
+                hideLoader()
+                sendBroadcast(
+                    Intent().apply {
+                        action = MyAccessibilityService.ACTION_START_AUTOMATION
+                    })
+                Toast.makeText(applicationContext, "Sent start command — enable accessibility and try again if needed", Toast.LENGTH_SHORT).show()
+            }
         }
 
         binding.btnExportData.setOnClickListener {
@@ -174,9 +177,10 @@ class MainActivity : AppCompatActivity() {
 
                 // 3️⃣ Safe execution
                 Log.e("PINCODE", " ${currentPincode}  Lat=${latLng.lat}, Lng=${latLng.lng}")
-                HectorScraper.currentLat = latLng.lat
-                HectorScraper.currentLng = latLng.lng
-                Log.e("PINCODE", "${currentPincode}   Lat=${HectorScraper.currentLat}, Lng=${HectorScraper.currentLng}")
+//                HectorScraper.currentLat = latLng.lat
+//                HectorScraper.currentLng = latLng.lng
+                PreferenceManager.saveLocation(latitude = latLng.lat, longitude = latLng.lng)
+                Log.e("PINCODE", "${currentPincode}   Lat=${PreferenceManager.getLatitude()}, Lng=${PreferenceManager.getLongitude()}")
 
                 val intent = Intent(this@MainActivity, MockLocationService::class.java).apply {
                     putExtra("LAT", latLng.lat)   // dynamic
@@ -200,7 +204,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkAccessibilityPermission() {
-        val enabled = AccessibilityChecker.isServiceEnabled(
+        val enabled = Extension.isServiceEnabled(
             this, MyAccessibilityService::class.java
         )
 
@@ -250,7 +254,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun setUpObserver() {
         viewModel.categoryData.observe(this) {
-            HectorScraper.keyword = it.category.toString()
+            currentCategory = it.category.toString()
             Toast.makeText(applicationContext, "${it.category}", Toast.LENGTH_SHORT).show()
         }
         viewModel.getNetworkStates().observe(this) {
@@ -317,24 +321,109 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        Log.e("TAG", "onResume: $currentIndex")
+        Log.e("TAG", "onResume: $pincodeIndex")
         checkAccessibilityPermission()
         if (hasLocationPermission(this) && hasNotificationPermission(this)) {
             onAllPermissionsGranted()
         }
+//        if (HectorScraper.killInstamartApp) {
+//            HectorScraper.isAddressStored = false
+//            pincodeIndex++
+//            if (pincodeIndex >= pincodeList.size) {
+//                Log.e("PIN_PROCESS", "✅ All pincodes completed")
+//                Toast.makeText(this@MainActivity, "✅ All pincodes completed", Toast.LENGTH_SHORT).show()
+//                return
+//            }
+//
+//            currentPincode = pincodeList[pincodeIndex]
+//            Log.e("TAG", "onResume: $pincodeIndex  $currentPincode   ${pincodeList.size}")
+//            binding.btnStartAutomation.performClick()
+//            HectorScraper.killInstamartApp = false
+//        }
+
+//        if (HectorScraper.killInstamartApp) {
+//
+//            HectorScraper.killInstamartApp = false
+//            HectorScraper.isAddressStored = false
+//
+//            // ✅ Move to next category
+//            categoryIndex++
+//
+//            // 🔄 If all categories done → move to next pincode
+//            if (categoryIndex >= categoryList.size) {
+//                categoryIndex = 0
+//                pincodeIndex++
+//            }
+//
+//            // ❌ All pincodes completed
+//            if (pincodeIndex >= pincodeList.size) {
+//                Log.e("PIN_PROCESS", "✅ All pincodes & categories completed")
+//                Toast.makeText(
+//                    this@MainActivity, "✅ All pincodes & categories completed", Toast.LENGTH_SHORT
+//                ).show()
+//                return
+//            }
+//
+//            // ✅ Set current values
+//            currentPincode = pincodeList[pincodeIndex]
+//            currentCategory = categoryList[categoryIndex]
+//
+//            Log.e(
+//                "AUTOMATION_FLOW",
+//                "📍 Pincode (${pincodeIndex + 1}/${pincodeList.size}) = $currentPincode | " + "🗂 Category (${categoryIndex + 1}/${categoryList.size}) = $currentCategory"
+//            )
+//
+//            // 🔥 Restart automation
+//            binding.btnStartAutomation.performClick()
+//        }
+
         if (HectorScraper.killInstamartApp) {
+
+            HectorScraper.killInstamartApp = false
             HectorScraper.isAddressStored = false
-            currentIndex++
-            if (currentIndex >= pincodeList.size) {
-                Log.e("PIN_PROCESS", "✅ All pincodes completed")
-                Toast.makeText(this@MainActivity, "✅ All pincodes completed", Toast.LENGTH_SHORT).show()
+
+            // 🔁 Move to next category
+            categoryIndex++
+
+            var isPincodeChanged = false
+
+            // 🔄 If all categories done → move to next pincode
+            if (categoryIndex >= categoryList.size) {
+                categoryIndex = 0
+                pincodeIndex++
+                isPincodeChanged = true   // ✅ mark pincode change
+            }
+
+            // ❌ All pincodes completed
+            if (pincodeIndex >= pincodeList.size) {
+                Log.e("PIN_PROCESS", "✅ All pincodes & categories completed")
+                Toast.makeText(
+                    this@MainActivity,
+                    "✅ All pincodes & categories completed",
+                    Toast.LENGTH_SHORT
+                ).show()
                 return
             }
 
-            currentPincode = pincodeList[currentIndex]
-            Log.e("TAG", "onResume: $currentIndex  $currentPincode   ${pincodeList.size}")
+            // 🔥 Reset storeId ONLY when pincode changes
+            if (isPincodeChanged) {
+                HectorScraper.storeid = ""
+                Log.e("STORE_ID", "♻️ StoreId reset due to pincode change")
+            }
+
+            // ✅ Set current values
+            currentPincode = pincodeList[pincodeIndex]
+            currentCategory = categoryList[categoryIndex]
+
+            Log.e(
+                "AUTOMATION_FLOW",
+                "📍 Pincode (${pincodeIndex + 1}/${pincodeList.size}) = $currentPincode | " +
+                        "🗂 Category (${categoryIndex + 1}/${categoryList.size}) = $currentCategory | " +
+                        "🏬 StoreId = ${HectorScraper.storeid}"
+            )
+
+            // 🔁 Restart automation
             binding.btnStartAutomation.performClick()
-            HectorScraper.killInstamartApp = false
         }
     }
 
