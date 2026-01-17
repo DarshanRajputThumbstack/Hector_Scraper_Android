@@ -26,6 +26,7 @@ class HectorScraper : Application(), LifecycleObserver {
 
         var currentLat = 0.0
         var currentLng = 0.0
+        var isSwiggyUnavailable = false
 
         val categoryList = listOf("Bath and Body", "Hair Care", "Skincare", "Makeup")
 
@@ -164,16 +165,32 @@ class HectorScraper : Application(), LifecycleObserver {
 //            "562157",
 //            "562162",
 //            "500003",
+            "560021", // Store ID can't get
+            "562106",
             "500016",
+            "562123",
             "500047",
+            "560086", // Store ID can't get
             "400706",
             "400708",
             "400705",
             "560006",
+            "141001", // Ludhiana
+            "411014", // Pune
+            "313001", // Udaipur
+            "641001",  // Coimbatore
+            "201301", // Noida
+            "400065", // Andheri, Mumbai
+            "110080", // Delhi (Sangam Vihar)
+            "110045", // West Delhi
+            "226001", // Lucknow
             "560007",
             "560008",
             "560016",
             "560017",
+            "380001", // Ahmedabad
+            "700001", // Kolkata
+            "380009",
         )
 
 //        val uniquePincodeList = pincodeList

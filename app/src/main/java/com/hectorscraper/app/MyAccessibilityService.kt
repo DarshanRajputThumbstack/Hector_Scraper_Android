@@ -30,6 +30,7 @@ import com.hectorscraper.app.randomiseFlow.WishListFlowHandler
 import com.hectorscraper.app.utils.ExcelManager
 import com.hectorscraper.app.utils.HectorScraper
 import com.hectorscraper.app.utils.HectorScraper.Companion.currentPincode
+import com.hectorscraper.app.utils.HectorScraper.Companion.isSwiggyUnavailable
 import com.hectorscraper.app.utils.HectorScraper.Companion.killInstamartApp
 import kotlin.random.Random
 
@@ -61,10 +62,14 @@ class MyAccessibilityService : AccessibilityService() {
     private var viewCartRetryCount = 0
     private val MAX_VIEW_CART_RETRY = 5
 
+    private var storeIdFlowRunning = false
+
+    //    private var storeIdRetryCount = 0
+//    private val MAX_STOREID_RETRY = 3
     private var hectorShareRetryCount = 0
     private val MAX_SHARE_RETRY = 3
     private var storeIdRetryCount = 0
-    private val MAX_STOREID_RETRY = 5
+    private val MAX_STOREID_RETRY = 3
     private var flowStartTime: Long = 0L
     private var flowElapsedTimeMs: Long = 0L   // ✅ STORED VALUE
     private var shouldStart = false
@@ -88,6 +93,9 @@ class MyAccessibilityService : AccessibilityService() {
     private var isWishListFlow = false
     private var typingScheduled = false
     private var appClosed = false
+
+    private var availabilityChecked = false   // run only once
+    private var flowInProgress = false         // block re-entry
 
     private var lastQuantity = -1
     private var sameCountHits = 0
@@ -198,6 +206,8 @@ class MyAccessibilityService : AccessibilityService() {
                 isWishListFlow = false
                 isRandomFunCalled = false
                 isRandomFlowDone = false
+                flowInProgress = false
+                availabilityChecked = false
 
                 handler.postDelayed({
                     waitForAppToLoad = false
@@ -255,32 +265,49 @@ class MyAccessibilityService : AccessibilityService() {
 
         val root = rootInActiveWindow ?: return
 
+//            clickCloseButton()
+//            if (!isWishListFlow) {
+//                dumpTree(rootInActiveWindow)
+//            }
 
         handler.postDelayed({
             clickCloseOverlay()
             clickToBtnProcessed()
-//            clickCloseButton()
-//            if (!isWishListFlow) {
-//                dumpTree(rootInActiveWindow)
-//
-//            }
         }, 3000)
 
         if (!searchClicked) {
             handler.postDelayed({
+                if (flowInProgress) return@postDelayed
                 clickCloseIcon()
 //                if (!isRandomFunCalled) {
 //                    callRandomFlowRandomly(root)
 //                }
 //                if (isRandomFlowDone) {
-                handler.postDelayed({
-                    if (!HectorScraper.isAddressStored) {
-                        startFlowTimer()
-                        clearAllValues()
-                        extractAddressDetails()
+//                handler.postDelayed({
+//                    if (!HectorScraper.isAddressStored) {
+//                        startFlowTimer()
+//                        clearAllValues()
+//                        extractAddressDetails()
+//                    }
+//                    clickSearchBar(root)
+//                }, 2000)
+                if (!HectorScraper.isAddressStored) {
+                    startFlowTimer()
+                    clearAllValues()
+                    if (!availabilityChecked) {
+                        availabilityChecked = true
+                        flowInProgress = true
+                        isSwiggyUnavailable = checkInstamartAvailable(root)
+                        if (isSwiggyUnavailable) {
+                            addRowOnSheet()
+                        } else {
+                            extractAddressDetails()
+                        }
                     }
+                }
+                if (!isSwiggyUnavailable) {
                     clickSearchBar(root)
-                }, 2000)
+                }
 //                }
             }, 4000)
             return
@@ -296,6 +323,53 @@ class MyAccessibilityService : AccessibilityService() {
             }
             return
         }
+    }
+
+    private fun addRowOnSheet() {
+        val app = applicationContext as HectorScraper
+
+        stopFlowTimer()
+        val flowElapsedTimeSec = flowElapsedTimeMs / 1000
+
+        val values = listOf(
+            app.getTodayDate(),
+            app.getCurrentTime(),
+            darkStoreId,
+            merchantId,
+            productId,
+            productName,
+            productBrand,
+            productUrl,
+            productWeight,
+            level1Category,
+            level2Category,
+            level3Category,
+            darkStoreName,
+            darkStoreAddress,
+            city,
+            darkStoreLocality,
+            currentPincode,
+            darkStorePlusCode,
+            if (productInventory != "0") "true" else "false",
+            if (etaIdentifier.isNotEmpty()) "true" else "false",
+            productInventory,
+            productMRP,
+            productSellingPrice,
+            productDiscountPercentage,
+            etaIdentifier,
+            "",
+            0,
+            "",
+            flowElapsedTimeSec
+        )
+        ExcelManager.addRow(this, values as List<Any>)
+        Toast.makeText(this, "Row added", Toast.LENGTH_SHORT).show()
+        killAppAndBackToScraperApp()
+    }
+
+    private fun checkInstamartAvailable(root: AccessibilityNodeInfo): Boolean {
+        val nodes = root.findAccessibilityNodeInfosByText("don’t deliver here")
+        return !nodes.isNullOrEmpty()
     }
 
     private fun clickToBtnProcessed() {
@@ -1315,6 +1389,8 @@ class MyAccessibilityService : AccessibilityService() {
 //    }
 
     fun extractAddressDetails() {
+        availabilityChecked = false
+        flowInProgress = false
         val desc = getAddressDesc() ?: return
         parseAddress(desc)
     }
@@ -1417,9 +1493,9 @@ class MyAccessibilityService : AccessibilityService() {
             HectorScraper.isAddressStored = true
         }
     }
-    // ---------------------------------------------------------
-    // LAUNCH APP
-    // ---------------------------------------------------------
+// ---------------------------------------------------------
+// LAUNCH APP
+// ---------------------------------------------------------
 
     private fun launchInstamart() {
         Log.e(TAG, "launchInstamart instamart: ${isInstamartAvailable(applicationContext)}")
@@ -1722,9 +1798,9 @@ class MyAccessibilityService : AccessibilityService() {
             context.startActivity(launchIntent)
         }
     }
-    // ---------------------------------------------------------
-    // SEARCH BAR → TYPE → CLICK SUGGESTION FLOW
-    // ---------------------------------------------------------
+// ---------------------------------------------------------
+// SEARCH BAR → TYPE → CLICK SUGGESTION FLOW
+// ---------------------------------------------------------
 
     private fun clickSearchBar(root: AccessibilityNodeInfo) {
         Log.e(TAG, "🔍 Looking for search bar...")
@@ -1882,7 +1958,8 @@ class MyAccessibilityService : AccessibilityService() {
 
             handler.postDelayed({
                 if (HectorScraper.storeid.isEmpty()) {
-                    clickOnShare()
+//                    clickOnShare()
+                    startStoreIdFlow()
                 } else {
                     logProductDetails()
                 }
@@ -2074,7 +2151,9 @@ class MyAccessibilityService : AccessibilityService() {
                     clickableParent.performAction(AccessibilityNodeInfo.ACTION_CLICK)
 
                     handler.postDelayed({
-                        handleStoreIdFlow()
+                        if (storeIdFlowRunning) {
+                            handleStoreIdFlow()
+                        }
                     }, 2000)
 
                     return true
@@ -2086,37 +2165,93 @@ class MyAccessibilityService : AccessibilityService() {
         return false
     }
 
+//    private fun handleStoreIdFlow() {
+//        // ✅ Success case
+//        if (HectorScraper.storeid.isNotEmpty()) {
+//            Log.e("STORE_ID", "✅ StoreId received = ${HectorScraper.storeid}")
+//            storeIdRetryCount = 0
+//            handler.postDelayed({ logProductDetails() }, 2000)
+//            return
+//        }
+//
+//        // ❌ Retry exhausted
+//        if (storeIdRetryCount >= MAX_STOREID_RETRY) {
+//            Log.e("STORE_ID", "❌ StoreId not received after $MAX_STOREID_RETRY attempts")
+//            storeIdRetryCount = 0
+//
+//            // Continue rest flow even if storeId missing
+//            handler.postDelayed({ logProductDetails() }, 2000)
+//            return
+//        }
+//
+//        // 🔁 Retry fetch
+//        storeIdRetryCount++
+//        Log.e(
+//            "STORE_ID", "🔁 Retrying fetch StoreId ($storeIdRetryCount/$MAX_STOREID_RETRY)"
+//        )
+//
+//        clickOnShare()
+//
+//        // Wait for share → close → callback → storeId update
+//        handler.postDelayed({
+//            handleStoreIdFlow()
+//        }, 2500)
+//    }
+
+    private fun startStoreIdFlow() {
+        if (storeIdFlowRunning) {
+            Log.e("STORE_ID", "⏸ StoreId flow already running")
+            return
+        }
+
+        storeIdFlowRunning = true
+        storeIdRetryCount = 0
+
+        Log.e("STORE_ID", "▶️ Starting StoreId flow")
+        clickOnShare()
+    }
+
     private fun handleStoreIdFlow() {
-        // ✅ Success case
+
+        // ✅ SUCCESS
         if (HectorScraper.storeid.isNotEmpty()) {
             Log.e("STORE_ID", "✅ StoreId received = ${HectorScraper.storeid}")
+
+            storeIdFlowRunning = false
             storeIdRetryCount = 0
-            handler.postDelayed({ logProductDetails() }, 2000)
+
+            handler.postDelayed({ logProductDetails() }, 1500)
             return
         }
 
-        // ❌ Retry exhausted
+        // ❌ RETRIES EXHAUSTED
         if (storeIdRetryCount >= MAX_STOREID_RETRY) {
-            Log.e("STORE_ID", "❌ StoreId not received after $MAX_STOREID_RETRY attempts")
+            Log.e(
+                "STORE_ID", "❌ StoreId not received after $MAX_STOREID_RETRY attempts"
+            )
+
+            storeIdFlowRunning = false
             storeIdRetryCount = 0
 
-            // Continue rest flow even if storeId missing
-            handler.postDelayed({ logProductDetails() }, 2000)
+            // Continue flow even without storeId
+            handler.postDelayed({ logProductDetails() }, 2500)
             return
         }
 
-        // 🔁 Retry fetch
+        // 🔁 RETRY
         storeIdRetryCount++
         Log.e(
-            "STORE_ID", "🔁 Retrying fetch StoreId ($storeIdRetryCount/$MAX_STOREID_RETRY)"
+            "STORE_ID", "🔁 Retrying StoreId fetch ($storeIdRetryCount/$MAX_STOREID_RETRY)"
         )
 
         clickOnShare()
 
-        // Wait for share → close → callback → storeId update
+        // 🔁 Check again after share flow settles
         handler.postDelayed({
-            handleStoreIdFlow()
-        }, 2500)
+            if (storeIdFlowRunning) {
+                handleStoreIdFlow()
+            }
+        }, 3000)
     }
 
     fun findClickableParent(node: AccessibilityNodeInfo?): AccessibilityNodeInfo? {
@@ -3569,9 +3704,11 @@ class MyAccessibilityService : AccessibilityService() {
                 killInstamartApp = true
                 Handler(Looper.getMainLooper()).postDelayed({
                     tapCenter()
+                    availabilityChecked = false
+                    flowInProgress = false
                 }, 2000)
             }
-        }, 2000)
+        }, 3000)
     }
 
     fun extractMinutes(input: String?): String {

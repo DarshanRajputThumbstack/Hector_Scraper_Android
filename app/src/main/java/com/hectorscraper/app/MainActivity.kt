@@ -36,6 +36,7 @@ import com.hectorscraper.app.utils.HectorScraper.Companion.categoryIndex
 import com.hectorscraper.app.utils.HectorScraper.Companion.categoryList
 import com.hectorscraper.app.utils.HectorScraper.Companion.currentCategory
 import com.hectorscraper.app.utils.HectorScraper.Companion.currentPincode
+import com.hectorscraper.app.utils.HectorScraper.Companion.isSwiggyUnavailable
 import com.hectorscraper.app.utils.HectorScraper.Companion.pincodeIndex
 import com.hectorscraper.app.utils.HectorScraper.Companion.pincodeList
 import com.hectorscraper.app.utils.PreferenceManager
@@ -377,21 +378,83 @@ class MainActivity : AppCompatActivity() {
 //            binding.btnStartAutomation.performClick()
 //        }
 
+//        if (HectorScraper.killInstamartApp) {
+//
+//            HectorScraper.killInstamartApp = false
+//            HectorScraper.isAddressStored = false
+//
+//            // 🔁 Move to next category
+//            categoryIndex++
+//
+//            var isPincodeChanged = false
+//
+//            // 🔄 If all categories done → move to next pincode
+//            if (categoryIndex >= categoryList.size) {
+//                categoryIndex = 0
+//                pincodeIndex++
+//                isPincodeChanged = true   // ✅ mark pincode change
+//            }
+//
+//            // ❌ All pincodes completed
+//            if (pincodeIndex >= pincodeList.size) {
+//                Log.e("PIN_PROCESS", "✅ All pincodes & categories completed")
+//                Toast.makeText(
+//                    this@MainActivity,
+//                    "✅ All pincodes & categories completed",
+//                    Toast.LENGTH_SHORT
+//                ).show()
+//                return
+//            }
+//
+//            // 🔥 Reset storeId ONLY when pincode changes
+//            if (isPincodeChanged) {
+//                HectorScraper.storeid = ""
+//                Log.e("STORE_ID", "♻️ StoreId reset due to pincode change")
+//            }
+//
+//            // ✅ Set current values
+//            currentPincode = pincodeList[pincodeIndex]
+//            currentCategory = categoryList[categoryIndex]
+//
+//            Log.e(
+//                "AUTOMATION_FLOW",
+//                "📍 Pincode (${pincodeIndex + 1}/${pincodeList.size}) = $currentPincode | " +
+//                        "🗂 Category (${categoryIndex + 1}/${categoryList.size}) = $currentCategory | " +
+//                        "🏬 StoreId = ${HectorScraper.storeid}"
+//            )
+//
+//            // 🔁 Restart automation
+//            binding.btnStartAutomation.performClick()
+//        }
+
         if (HectorScraper.killInstamartApp) {
 
             HectorScraper.killInstamartApp = false
             HectorScraper.isAddressStored = false
 
-            // 🔁 Move to next category
-            categoryIndex++
-
             var isPincodeChanged = false
 
-            // 🔄 If all categories done → move to next pincode
-            if (categoryIndex >= categoryList.size) {
+            // 🔴 IF STORE UNAVAILABLE → SKIP ALL CATEGORIES
+            if (isSwiggyUnavailable) {
                 categoryIndex = 0
                 pincodeIndex++
-                isPincodeChanged = true   // ✅ mark pincode change
+                isPincodeChanged = true
+
+                Log.e(
+                    "AUTOMATION_FLOW",
+                    "⏭ Instamart unavailable → Skipping categories, moving to next pincode"
+                )
+
+                isSwiggyUnavailable = false   // 🔐 reset flag
+            } else {
+                // 🔁 Normal category increment
+                categoryIndex++
+
+                if (categoryIndex >= categoryList.size) {
+                    categoryIndex = 0
+                    pincodeIndex++
+                    isPincodeChanged = true
+                }
             }
 
             // ❌ All pincodes completed
